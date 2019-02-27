@@ -4,22 +4,27 @@ import './App.css';
 import 'bootstrap/dist/css/bootstrap.css';
 import Camera, {IMAGE_TYPES} from 'react-html5-camera-photo';
 import 'react-html5-camera-photo/build/css/index.css';
+import { AST_PropAccess } from 'terser';
 
 const subscriptionKey = process.env.REACT_APP_FACE_API_SUBSCRIPTION_KEY;
 
 const Image = (props) => {
 	return (
   <div>
-  <img style={{width:300}} src={props.imageUrl}/>
+  <img style={{width:500}} src={props.imageUrl}/>
   </div>
   )
 } 
 
 const Info = (props) => {
-	 console.log(typeof(props.faceAttributes.emotion));
-	 let emotions = [];
-	 if (props.faceAttributes.emotion != undefined) { 
+	 var emotions = [];
+	 if ((props.faceAttributes.emotion !== undefined || props.faceAttributes.length != 0 )&& props.errorMessage == "") { 
 		emotions = props.faceAttributes.emotion;
+	 }
+	 else {
+		 return (
+			<div style={{color:"red"}}><h3>{props.errorMessage}</h3></div>
+		 );
 	 }
 	return (
   	<div>
@@ -40,7 +45,7 @@ class FaceRecognitionForm extends React.Component {
 		
   	event.preventDefault();
 
-	fetch('https://northeurope.api.cognitive.microsoft.com/face/v1.0/detect?returnFaceID=false&&returnFaceAttributes=age', {
+	fetch('https://northeurope.api.cognitive.microsoft.com/face/v1.0/detect?returnFaceID=false&&returnFaceAttributes=age,emotion', {
 		method: 'POST',
 		headers: {
 			'Accept': 'application/json',
@@ -76,14 +81,11 @@ class FaceRecognitionForm extends React.Component {
 }
 
 
-
-
-
-class App extends Component {
+class FaceRecognition extends Component {
 	state = {
 		faceAttributes: [],
 		imageUrl: '',
-		blob: '',
+		errorMessage: "",
 	};
 
 	addFaceInfo = (faceInfo, imageUrl) => {
@@ -93,7 +95,11 @@ class App extends Component {
 		}));
 	}
 
-	createBlob (dataUri, blobType){
+	addErrorMessage = (errorMessage) => {
+		this.setState({errorMessage: errorMessage,})
+	}
+
+	createBlob (dataUri, blobType) {
 		var binary = atob(dataUri.split(',')[1]), array = [];
 		for(var i = 0; i < binary.length; i++) array.push(binary.charCodeAt(i));
 		return new Blob([new Uint8Array(array)], {type: blobType});
@@ -118,25 +124,39 @@ class App extends Component {
 					throw new Error(response.statusText);
 				}
 		  }).then(data => {
-			  this.addFaceInfo(data[0])
-				//this.props.onSubmit(data[0], this.state.imageUrl);
+			  if(data.length != 0){
+				this.addFaceInfo(data[0], dataUri);
+				this.addErrorMessage("");
+			  }
+			  else {
+				  this.addErrorMessage("No face detected");
+			  }
 		  })
 	}
 
 	render() {
 		return (
-		<div className="App">
+		<div className="FaceRecognition">
 			<FaceRecognitionForm onSubmit={this.addFaceInfo} imageUrl={this.state.imageUrl}/>
 			<Image imageUrl={this.state.imageUrl} />
-			<Info faceAttributes={this.state.faceAttributes}/>
+			<Info faceAttributes={this.state.faceAttributes} errorMessage={this.state.errorMessage}/>
 			<Camera onTakePhoto = {(dataUri) => {this.onTakePhoto(dataUri) } } 
 					idealResolution = {{width: 640, height: 480}}
-					imageType = {IMAGE_TYPES.JPG}/>
-			
-
+					imageType = {IMAGE_TYPES.JPG}
+					/>
 		</div>
 
 		);
+	}
+}
+
+class App extends React.Component {
+	render () {
+		return (
+			<div className="App">
+				<FaceRecognition />
+			</div>
+		)
 	}
 }
 
